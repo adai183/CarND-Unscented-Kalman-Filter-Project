@@ -354,6 +354,40 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
        0, std_laspy_*std_laspy_;
   S = S + R;
 
+  /*******************************************************************************
+  * Update
+  ******************************************************************************/
+
+  //cross correlation matrix
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
+
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z_diff = z - z_pred;
+
+  //calculate NIS
+  NIS_laser_  = z_diff.transpose() * S.inverse() * z_diff;
+
+  //update state mean and covariance matrix
+  x_ = x_ + K * z_diff;
+  P_ = P_ - K*S*K.transpose();
+
 
 }
 
@@ -462,6 +496,10 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //angle normalization
   while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
   while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+
+  //calculate NIS
+  NIS_radar_  = z_diff.transpose() * S.inverse() * z_diff;
+
 
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
